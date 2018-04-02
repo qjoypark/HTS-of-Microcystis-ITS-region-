@@ -1,0 +1,46 @@
+otu<-read.table(pipe("pbpaste"),sep="\t",header=T,row.names = 1)
+env<-read.table(pipe("pbpaste"),sep="\t",header=T,row.names = 1) ####注意顺序#### 
+group<-read.table(pipe("pbpaste"),sep="\t",header=T)
+
+otu<-t(otu) #####保证一一对应
+#data normolization (Legendre and Gallagher,2001)
+##by log
+env.data.log <- log1p(env)
+##delete NA
+env <- na.omit(env.data.log)
+###hellinger transform
+otu.hell <- decostand(otu, "hellinger")
+sel <- decorana(otu.hell)
+sel
+plot(sel)
+##########选做db-RDA
+otu.tab.1<- rda(otu.hell ~ ., env)
+vif.cca(otu.tab.1)###逐步筛选每次删除一项最大的直到所有的小于10
+p<- autoplot(otu.tab.1, arrows = TRUE,axes = c(1, 2), geom =  c("point", "text"), layers = c( "species","sites", "biplot", "centroids"), legend.position = "right", title = "RDA")
+rdare<-rda
+rdare$CCA$biplot
+#################RDA
+fun1<- rda(otu.hell ~ ., env)
+plot(fun1)
+pbase<-plot(fun1)
+mult <- attributes(pbase$biplot)$arrow.mul
+######绘图#######
+library(ggvegan)
+
+fdat <- fortify(fun1)
+tb1<-filter(fdat,Score=="biplot")
+tb2<-filter(fdat,Score=="sites")
+
+tb2<-cbind(tb2,group$Group)
+colnames(tb2)[9]<-"Group"
+
+tb3<-cbind(tb1[,c(3,4)]*mult,tb1$Label)
+colnames(tb3)[3]<-"Label"
+p2<-ggplot(tb3,aes(RDA1,RDA2))+
+  geom_point(data=tb2,aes(RDA1,RDA2,color=Group))+
+  geom_segment(aes(x=0,y=0,xend=RDA1,yend=RDA2),color="grey",arrow = arrow(angle=15,length=unit(0.3,"cm")))+
+  theme_bw()+geom_text(aes(label=Label),hjust = (1-2*sign(tb3$RDA1))/3)+
+  geom_text(data=tb2,aes(label=Label),vjust=2)
+p2<-p2+scale_x_continuous(limits = c(-1,1))
+p2<-p2+theme(panel.grid = element_blank())
+p2
